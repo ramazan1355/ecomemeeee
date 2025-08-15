@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ecomeme - Квест в Талдыкоргане</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Arial',sans-serif}
+        body{background:#f0f4f8;height:100vh;overflow:hidden;position:relative}
+        .header{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.1);position:relative;z-index:1000}
+        .logo{font-size:1.8rem;font-weight:bold;color:#2d3748;letter-spacing:1px}
+        .user-panel{display:flex;align-items:center;gap:15px}
+        .user-info{display:flex;flex-direction:column;align-items:flex-end}
+        .user-name{font-weight:bold;font-size:1rem}
+        .user-level{font-size:.8rem;color:#4a5568}
+        .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(45deg,#3498db,#2ecc71);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold}
+        #map{height:calc(100vh - 120px);width:100%}
+        .control-panel{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:90%;max-width:400px;height:80px;background:url('панель.png') no-repeat center center/contain;display:flex;justify-content:center;align-items:center;z-index:500}
+        .play-btn{width:60px;height:60px;background:url('плей.png') no-repeat center center/contain;cursor:pointer;transition:transform .3s}
+        .play-btn:hover{transform:scale(1.1)}
+        .task-panel{position:absolute;top:80px;left:20px;width:300px;background:rgba(255,255,255,.9);border-radius:15px;padding:20px;box-shadow:0 4px 15px rgba(0,0,0,.2);z-index:600;display:none}
+        .task-header{font-size:1.2rem;font-weight:bold;margin-bottom:15px;color:#2d3748;display:flex;align-items:center;gap:10px}
+        .task-marker{width:20px;height:30px;background-size:contain;background-repeat:no-repeat}
+        .task-marker.blue{background-image:url('синяя.png')}
+        .task-marker.red{background-image:url('красная.png')}
+        .task-content{font-size:.95rem;margin-bottom:15px;color:#4a5568;line-height:1.5}
+        .task-reward{display:flex;align-items:center;gap:10px;font-weight:bold;color:#27ae60}
+        .close-btn{position:absolute;top:15px;right:15px;width:25px;height:25px;cursor:pointer;background:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234a5568"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>')}
+        .route-info{position:absolute;top:80px;right:20px;background:rgba(255,255,255,.9);border-radius:15px;padding:15px;box-shadow:0 4px 15px rgba(0,0,0,.2);z-index:600;display:none}
+        .route-title{font-weight:bold;margin-bottom:10px;color:#2d3748}
+        .route-details{font-size:.9rem;color:#4a5568}
+        @keyframes pulse{0%{transform:translate(-50%,-100%) scale(1)}50%{transform:translate(-50%,-100%) scale(1.1)}100%{transform:translate(-50%,-100%) scale(1)}}
+        .player-marker{width:24px;height:24px;border-radius:50%;background:#e74c3c;border:3px solid #fff;box-shadow:0 0 10px rgba(231,76,60,.7);animation:pulse 2s infinite}
+        .player-arrow{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid #e74c3c;position:absolute;top:100%;left:50%;transform:translateX(-50%)}
+        /* Небольшой фид поверх карты (по умолчанию скрыт, включается клавишей F) */
+        .feed{position:absolute;bottom:120px;right:20px;width:320px;max-height:50vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:10px;z-index:700;display:none}
+        .feed h3{margin:0 0 8px 0;color:#2d3748}
+        .meme-card{border:1px solid #e2e8f0;border-radius:12px;padding:8px;margin-bottom:10px}
+        .meme-card img{width:100%;border-radius:8px;display:block}
+        .vote-row{display:flex;gap:8px;margin-top:6px}
+        .vote-row button{flex:1;border:none;border-radius:8px;padding:8px;cursor:pointer}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">ecomeme</div>
+        <div class="user-panel">
+            <div class="user-info">
+                <div class="user-name" id="uiName">Игрок EcoMeme</div>
+                <div class="user-level" id="uiLevel">Уровень: 5</div>
+            </div>
+            <div class="avatar" id="uiAvatar">EM</div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="control-panel">
+        <div class="play-btn" id="playBtn"></div>
+    </div>
+
+    <div class="task-panel" id="taskPanel">
+        <div class="close-btn" id="closeTask"></div>
+        <div class="task-header">
+            <div class="task-marker" id="taskMarkerIcon"></div>
+            <div id="taskTitle">Задание</div>
+        </div>
+        <div class="task-content" id="taskDescription"></div>
+        <div class="task-reward"><span>Награда:</span><span id="taskReward">+50 очков экологии</span></div>
+    </div>
+
+    <div class="route-info" id="routeInfo">
+        <div class="route-title">Маршрут к заданию</div>
+        <div class="route-details" id="routeDetails">Расстояние: <span id="routeDistance">0 м</span></div>
+    </div>
+
+    <!-- Небольшой фид (вкл/выкл клавишей F) -->
+    <div class="feed" id="feed"><h3>Фид мемов</h3><div id="feedList"></div></div>
+
+    <!-- Leaflet + Routing -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+    <!-- Firebase CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+    <script>
+    // --------- Firebase ----------
+    const firebaseConfig = {
+      apiKey: "AIzaSyARMVRCXSXkkcxlN-Y6qD2CnCVY0II3bSA",
+      authDomain: "ecomeme-app.firebaseapp.com",
+      projectId: "ecomeme-app",
+      storageBucket: "ecomeme-app.firebasestorage.app",
+      messagingSenderId: "501552032182",
+      appId: "1:501552032182:web:eedc8ecb07da2c26aef917",
+      measurementId: "G-H5TJEBL39G"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // --------- OpenAI (ВРЕМЕННО для демо — замени/удали потом) ----------
+    const OPENAI_API_KEY = "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";
+
+    async function generateCaption(taskTitle){
+      // Короткая смешная подпись под мем
+      const prompt = `Придумай очень короткую смешную подпись-мем (до 10 слов) на русском, про экодело: "${taskTitle}". Без хэштегов.`;
+      const r = await fetch("https://api.openai.com/v1/responses",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json","Authorization":`Bearer ${OPENAI_API_KEY}` },
+        body:JSON.stringify({
+          model:"gpt-4o-mini",
+          input: prompt,
+          max_output_tokens: 50
+        })
+      });
+      const j = await r.json();
+      const text = j.output_text || (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "Эко-герой на связи!";
+      return (""+text).trim().replace(/^"|"$/g,'');
+    }
+
+    // Рисуем мем на клиенте (текст поверх фото) — не меняя верстку
+    async function makeMemeFromImage(file, caption){
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      await new Promise(res=> img.onload = res);
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      // Поддержка вертикальных фото
+      const W = img.width, H = img.height;
+      canvas.width = W; canvas.height = H;
+
+      ctx.drawImage(img,0,0,W,H);
+      // Текст (обводка + белый fill)
+      const fontSize = Math.max(24, Math.floor(W/18));
+      ctx.font = `bold ${fontSize}px Arial`;
+      ctx.textAlign='center';
+      ctx.lineWidth = Math.ceil(fontSize/8);
+      ctx.strokeStyle='black';
+      ctx.fillStyle='white';
+
+      // Разбивка на строки по ширине
+      const words = caption.split(' ');
+      let lines = [], cur='';
+      for(const w of words){
+        const test = cur ? cur+' '+w : w;
+        if(ctx.measureText(test).width < W*0.9) cur = test;
+        else { lines.push(cur); cur = w; }
+      }
+      if(cur) lines.push(cur);
+
+      let y = H - fontSize*1.2*lines.length - fontSize*0.5;
+      lines.forEach(line=>{
+        ctx.strokeText(line, W/2, y);
+        ctx.fillText(line, W/2, y);
+        y += fontSize*1.2;
+      });
+
+      return new Promise(res=> canvas.toBlob(res, 'image/jpeg', 0.9));
+    }
+
+    // Загрузка файла в Storage
+    async function uploadBlobToStorage(blob, path){
+      const ref = storage.ref().child(path);
+      await ref.put(blob);
+      return await ref.getDownloadURL();
+    }
+
+    // Сохранение мема в Firestore
+    async function saveMemeDoc({uid, task, caption, imageUrl, lat, lng}){
+      const docRef = await db.collection('memes').add({
+        uid, taskId: task.id, taskTitle: task.title, caption, imageUrl,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        location: new firebase.firestore.GeoPoint(lat, lng),
+        up: 0, down: 0
+      });
+      return docRef.id;
+    }
+
+    // Голосование
+    async function voteMeme(memeId, val, uid){
+      const memeRef = db.collection('memes').doc(memeId);
+      const voteRef = memeRef.collection('votes').doc(uid);
+      return db.runTransaction(async (tx)=>{
+        const m = await tx.get(memeRef);
+        let up = m.exists ? (m.data().up||0) : 0;
+        let down = m.exists ? (m.data().down||0) : 0;
+
+        const v = await tx.get(voteRef);
+        const prev = v.exists ? v.data().val : 0;
+
+        // убираем прошлый голос
+        if(prev===1) up--;
+        if(prev===-1) down--;
+
+        // ставим новый
+        if(val===1) up++;
+        if(val===-1) down++;
+
+        tx.set(voteRef, {val},{merge:true});
+        tx.update(memeRef,{up,down});
+      });
+    }
+
+    // Апдейт очков пользователя
+    async function addUserScore(uid, delta){
+      const uref = db.collection('users').doc(uid);
+      await uref.set({score: firebase.firestore.FieldValue.increment(delta)}, {merge:true});
+    }
+
+    // ---------- Карта и игровой цикл ----------
+    const TALDIKORGAN = [45.0155, 78.3739];
+    let map, playerMarker, selectedTask, routeControl;
+    let playerPosition = TALDIKORGAN;
+    let watchId = null;
+
+    const tasks = [
+      { id:1, position:[45.019,78.370], type:"blue", title:"Полить деревья", description:"Найдите молодые деревья в парке и полейте их из лейки. Каждое дерево требует 5 литров воды.", reward:"+50 очков экологии" },
+      { id:2, position:[45.022,78.382], type:"blue", title:"Убрать мусор", description:"Соберите 10 единиц мусора в районе городского фонтана. Используйте перчатки и мешок для мусора.", reward:"+70 очков экологии" },
+      { id:3, position:[45.012,78.365], type:"red",  title:"Сфоткаться с мусоркой", description:"Найдите новую экологичную мусорку и сделайте креативное фото с ней. #EcoTaldikorgan", reward:"+30 очков экологии" },
+      { id:4, position:[45.008,78.378], type:"blue", title:"Посадить цветы", description:"Помогите посадить 5 цветов на клумбе возле памятника Абаю.", reward:"+60 очков экологии" },
+      { id:5, position:[45.025,78.360], type:"red",  title:"Найти эко-арт", description:"Найдите арт-объект из переработанных материалов и сфотографируйте его.", reward:"+40 очков экологии" }
+    ];
+
+    let ecoLayer = L.layerGroup(); // слой с мемами-героями
+
+    function initMap(){
+      map = L.map('map').setView(TALDIKORGAN, 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'&copy; OpenStreetMap contributors',maxZoom:18
+      }).addTo(map);
+
+      const blueIcon = L.icon({iconUrl:'синяя.png',iconSize:[30,40],iconAnchor:[15,40],popupAnchor:[0,-40],className:'custom-marker'});
+      const redIcon  = L.icon({iconUrl:'красная.png',iconSize:[30,40],iconAnchor:[15,40],popupAnchor:[0,-40],className:'custom-marker'});
+
+      tasks.forEach(task=>{
+        const icon = task.type==='blue' ? blueIcon : redIcon;
+        const marker = L.marker(task.position,{icon,taskId:task.id}).addTo(map);
+        marker.on('click', ()=> showTaskInfo(task));
+      });
+
+      playerMarker = L.marker(playerPosition,{
+        icon:L.divIcon({className:'player-marker',html:'<div class="player-arrow"></div>',iconSize:[24,36],iconAnchor:[12,18]})
+      }).addTo(map);
+
+      ecoLayer.addTo(map);
+      map.setView(playerPosition,14);
+    }
+
+    function showTaskInfo(task){
+      selectedTask = task;
+      document.getElementById('taskTitle').textContent = task.title;
+      document.getElementById('taskDescription').textContent = task.description;
+      document.getElementById('taskReward').textContent = task.reward;
+      const markerIcon = document.getElementById('taskMarkerIcon');
+      markerIcon.className = 'task-marker ' + task.type;
+      document.getElementById('taskPanel').style.display = 'block';
+
+      // Без изменения UI: спрашиваем в системном confirm
+      setTimeout(async ()=>{
+        if(confirm("Выполнил задание? Загрузить фото для мема?")){
+          await startPhotoFlow(task);
+        }
+      }, 200);
+    }
+
+    function buildRoute(){
+      if(!selectedTask){ alert('Выберите задание, нажав на маркер!'); return; }
+      if(routeControl) map.removeControl(routeControl);
+      routeControl = L.Routing.control({
+        waypoints:[ L.latLng(playerPosition[0],playerPosition[1]), L.latLng(selectedTask.position[0],selectedTask.position[1]) ],
+        routeWhileDragging:false, showAlternatives:false,
+        lineOptions:{styles:[{color:'#3498db',opacity:.7,weight:7}]},
+        createMarker:()=>null, collapsible:false
+      }).addTo(map);
+
+      routeControl.on('routesfound', e=>{
+        const routes = e.routes;
+        if(routes && routes.length){
+          const distance = Math.round(routes[0].summary.totalDistance);
+          document.getElementById('routeDistance').textContent = distance+' м';
+          document.getElementById('routeInfo').style.display = 'block';
+        }
+      });
+
+      startTracking();
+    }
+
+    function startTracking(){
+      if(watchId) navigator.geolocation.clearWatch(watchId);
+      watchId = navigator.geolocation.watchPosition(pos=>{
+        playerPosition = [pos.coords.latitude, pos.coords.longitude];
+        playerMarker.setLatLng(playerPosition);
+        if(routeControl && selectedTask){
+          routeControl.setWaypoints([ L.latLng(playerPosition[0],playerPosition[1]), L.latLng(selectedTask.position[0],selectedTask.position[1]) ]);
+        }
+        map.setView(playerPosition);
+      }, err=>{
+        console.warn('Геолокация недоступна, демо-движение', err);
+        simulateMovement();
+      }, {enableHighAccuracy:true,maximumAge:10000,timeout:5000});
+    }
+
+    function simulateMovement(){
+      let step=0;
+      const iv = setInterval(()=>{
+        if(step>100){ clearInterval(iv); return; }
+        const p = step/100;
+        if(!selectedTask) return;
+        playerPosition[0] = TALDIKORGAN[0] + (selectedTask.position[0]-TALDIKORGAN[0])*p;
+        playerPosition[1] = TALDIKORGAN[1] + (selectedTask.position[1]-TALDIKORGAN[1])*p;
+        playerMarker.setLatLng(playerPosition);
+        if(routeControl && selectedTask){
+          routeControl.setWaypoints([ L.latLng(playerPosition[0],playerPosition[1]), L.latLng(selectedTask.position[0],selectedTask.position[1]) ]);
+        }
+        map.setView(playerPosition);
+        step++;
+      }, 200);
+    }
+
+    // ---------- Фото → подпись → мем → загрузка ----------
+    async function startPhotoFlow(task){
+      const uid = (auth.currentUser && auth.currentUser.uid) || 'guest';
+      const file = await pickImageFile();
+      if(!file) return;
+
+      const caption = await generateCaption(task.title);
+      const memeBlob = await makeMemeFromImage(file, caption);
+
+      const stamp = Date.now();
+      const path = `memes/${uid}/${task.id}_${stamp}.jpg`;
+      const url = await uploadBlobToStorage(memeBlob, path);
+
+      await saveMemeDoc({uid, task, caption, imageUrl:url, lat:playerPosition[0], lng:playerPosition[1]});
+      await addUserScore(uid, 10); // +очки за выполненное задание
+
+      alert('Мем опубликован в общий фид!');
+      loadLatestMemes(); // обновим фид
+      plotEcoHeroes();   // обновим карту героев
+    }
+
+    function pickImageFile(){
+      return new Promise(res=>{
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*';
+        inp.onchange = ()=> res(inp.files && inp.files[0]);
+        inp.click();
+      });
+    }
+
+    // ---------- Фид + Эко-герои ----------
+    async function loadLatestMemes(){
+      const feed = document.getElementById('feedList');
+      feed.innerHTML = '';
+      const snap = await db.collection('memes').orderBy('createdAt','desc').limit(20).get();
+      snap.forEach(doc=>{
+        const m = doc.data(); const id = doc.id;
+        const card = document.createElement('div');
+        card.className='meme-card';
+        card.innerHTML = `
+          <div style="font-weight:bold;color:#2d3748;margin-bottom:6px">${m.taskTitle}</div>
+          <img src="${m.imageUrl}" alt="meme"/>
+          <div style="margin-top:6px;color:#4a5568">${m.caption||''}</div>
+          <div class="vote-row">
+            <button data-id="${id}" data-v="1">💚 ${m.up||0}</button>
+            <button data-id="${id}" data-v="-1">🤡 ${m.down||0}</button>
+          </div>
+        `;
+        card.querySelectorAll('button').forEach(b=>{
+          b.addEventListener('click', async ()=>{
+            const uid = (auth.currentUser && auth.currentUser.uid) || 'guest';
+            await voteMeme(b.dataset.id, Number(b.dataset.v), uid);
+            loadLatestMemes();
+          });
+        });
+        feed.appendChild(card);
+      });
+    }
+
+    async function plotEcoHeroes(){
+      ecoLayer.clearLayers();
+      const snap = await db.collection('memes').orderBy('createdAt','desc').limit(100).get();
+      snap.forEach(doc=>{
+        const m = doc.data();
+        if(!m.location) return;
+        const lat = m.location.latitude, lng = m.location.longitude;
+        const circle = L.circleMarker([lat,lng],{radius:8,weight:2,color:'#2ecc71',fillOpacity:0.8});
+        const html = `
+          <div style="max-width:220px">
+            <div style="font-weight:bold;margin-bottom:6px">${m.taskTitle}</div>
+            <img src="${m.imageUrl}" style="width:100%;border-radius:8px"/>
+            <div style="margin-top:6px">${m.caption||''}</div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <button id="up-${doc.id}" style="flex:1;border:none;border-radius:8px;padding:6px;cursor:pointer">💚 ${m.up||0}</button>
+              <button id="down-${doc.id}" style="flex:1;border:none;border-radius:8px;padding:6px;cursor:pointer">🤡 ${m.down||0}</button>
+            </div>
+          </div>
+        `;
+        circle.bindPopup(html);
+        circle.on('popupopen', ()=>{
+          const uid = (auth.currentUser && auth.currentUser.uid) || 'guest';
+          const up = document.getElementById(`up-${doc.id}`);
+          const down = document.getElementById(`down-${doc.id}`);
+          up.onclick = async ()=>{ await voteMeme(doc.id, 1, uid); plotEcoHeroes(); loadLatestMemes(); };
+          down.onclick = async ()=>{ await voteMeme(doc.id, -1, uid); plotEcoHeroes(); loadLatestMemes(); };
+        });
+        ecoLayer.addLayer(circle);
+      });
+    }
+
+    // ---------- UI + Init ----------
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      // Защита: если не вошёл — вернём на первую
+      auth.onAuthStateChanged(async user=>{
+        if(!user){ window.location.href='ecomeme.html'; return; }
+        // Имя/аватар в твою шапку
+        const name = user.isAnonymous ? 'Гость EcoMeme' : (user.displayName || 'Эко-герой');
+        document.getElementById('uiName').textContent = name;
+        document.getElementById('uiAvatar').textContent = (name.split(' ').map(s=>s[0]).join('')||'EM').slice(0,2).toUpperCase();
+
+        initMap();
+
+        document.getElementById('playBtn').addEventListener('click', buildRoute);
+        document.getElementById('closeTask').addEventListener('click', ()=>{ document.getElementById('taskPanel').style.display='none'; });
+
+        if(!navigator.geolocation){ alert('Ваш браузер не поддерживает геолокацию. Включен демо-режим.'); }
+
+        // Подгружаем мемы и героев
+        await loadLatestMemes();
+        await plotEcoHeroes();
+      });
+
+      // Горячая клавиша F — показать/скрыть фид поверх карты (без ломания верстки)
+      document.addEventListener('keydown', e=>{
+        if((e.key||'').toLowerCase()==='f'){
+          const f = document.getElementById('feed');
+          f.style.display = (f.style.display==='none'||!f.style.display) ? 'block' : 'none';
+        }
+      });
+    });
+    </script>
+</body>
+</html>

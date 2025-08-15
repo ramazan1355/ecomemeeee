@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ecomeme</title>
+    <link href="https://fonts.googleapis.com/css2?family=Konkhmer+Sleokchher&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{
+            font-family:'Konkhmer Sleokchher',system-ui;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px;color:#fff;
+            background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),url('fon.png') no-repeat center center/cover fixed;background-color:#2d3748;overflow:hidden
+        }
+        .logo{font-size:1.8rem;margin-top:10vh;margin-bottom:auto;text-align:center;color:#fff;font-weight:normal;opacity:0;transform:translateY(-20px);animation:fadeInDown .8s ease-out forwards}
+        .auth-buttons{display:flex;flex-direction:column;gap:15px;width:100%;max-width:250px;margin-top:auto;margin-bottom:10vh;opacity:0;transform:translateY(20px);animation:fadeInUp .8s ease-out .3s forwards}
+        .btn{padding:10px 20px;font-size:1rem;font-family:'Konkhmer Sleokchher',sans-serif;border:none;border-radius:8px;cursor:pointer;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,.1);transition:all .4s cubic-bezier(.175,.885,.32,1.275);position:relative;overflow:hidden}
+        .sign-in{background:linear-gradient(45deg,#6a11cb 0%,#2575fc 100%);color:#fff}
+        .sign-up{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.3)}
+        .btn::after{content:'';position:absolute;top:50%;left:50%;width:5px;height:5px;background:rgba(255,255,255,.5);opacity:0;border-radius:100%;transform:scale(1,1) translate(-50%);transform-origin:0 0}
+        .btn:hover::after{animation:ripple .6s ease-out}
+        @keyframes ripple{0%{transform:scale(0,0);opacity:.8}100%{transform:scale(50,50);opacity:0}}
+        .btn:hover{transform:scale(1.05);box-shadow:0 5px 15px rgba(0,0,0,.2)}
+        .sign-in:hover{background:linear-gradient(45deg,#5a0db5 0%,#1c65e0 100%)}
+        .sign-up:hover{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.5)}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @media (max-width:480px){.logo{font-size:1.6rem;margin-top:8vh}.auth-buttons{margin-bottom:8vh;max-width:220px}.btn{padding:8px 16px;font-size:.9rem}}
+    </style>
+</head>
+<body>
+    <h1 class="logo">ecomeme</h1>
+    <div class="auth-buttons">
+        <button class="btn sign-in" id="btnSignIn">sing in</button>
+        <button class="btn sign-up" id="btnSignUp">sing up</button>
+    </div>
+
+    <!-- Firebase (CDN) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script>
+        // Firebase конфиг — как ты прислал
+        const firebaseConfig = {
+          apiKey: "AIzaSyARMVRCXSXkkcxlN-Y6qD2CnCVY0II3bSA",
+          authDomain: "ecomeme-app.firebaseapp.com",
+          projectId: "ecomeme-app",
+          storageBucket: "ecomeme-app.firebasestorage.app",
+          messagingSenderId: "501552032182",
+          appId: "1:501552032182:web:eedc8ecb07da2c26aef917",
+          measurementId: "G-H5TJEBL39G"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Плавная анимация, затем переход (после успеха входа)
+        function goNext() {
+          document.querySelector('.logo').style.animation = 'fadeInDown 0.5s ease-out reverse forwards';
+          document.querySelector('.auth-buttons').style.animation = 'fadeInUp 0.5s ease-out reverse forwards';
+          setTimeout(()=>{ window.location.href='ecomeme1.html'; }, 450);
+        }
+
+        // "sing in" — анонимный вход (моментально, без UI)
+        document.getElementById('btnSignIn').addEventListener('click', async ()=>{
+          try{
+            await auth.signInAnonymously();
+            goNext();
+          }catch(e){ alert(e.message); }
+        });
+
+        // "sing up" — Google Sign-In (попап), дизайн не меняем
+        document.getElementById('btnSignUp').addEventListener('click', async ()=>{
+          try{
+            const provider = new firebase.auth.GoogleAuthProvider();
+            await auth.signInWithPopup(provider);
+            goNext();
+          }catch(e){ alert(e.message); }
+        });
+
+        // Если уже вошёл — сразу на карту
+        auth.onAuthStateChanged(user=>{ if(user) goNext(); });
+
+        // Твоя проверка поддержки анимаций
+        const style = document.createElement('style');
+        style.textContent = `
+            @supports (animation: fadeInDown 1s) {
+                .logo, .auth-buttons { visibility: visible; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
